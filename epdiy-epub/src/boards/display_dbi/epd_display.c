@@ -526,6 +526,9 @@ void epd_load_and_send_pic(LCDC_HandleTypeDef *hlcdc, uint32_t line_type, const 
 }
 
 
+#define PART_DISP_TIMES 10
+static uint32_t reflesh_times = 0;
+
 L1_RET_CODE_SECT(epd_codes, static void LCD_WriteMultiplePixels(LCDC_HandleTypeDef *hlcdc, const uint8_t *RGBCode, uint16_t Xpos0, uint16_t Ypos0, uint16_t Xpos1, uint16_t Ypos1))
 {
     uint32_t line, line_bytes;
@@ -555,9 +558,15 @@ L1_RET_CODE_SECT(epd_codes, static void LCD_WriteMultiplePixels(LCDC_HandleTypeD
 
     uint8_t temperature = 26;
 
+    if (reflesh_times % PART_DISP_TIMES == 0) {
+        frame_times = epd_wave_table_get_frames(temperature, EPD_DRAW_MODE_FULL);
+        reflesh_times = 0;
+    } else {
+        frame_times = epd_wave_table_get_frames(temperature, EPD_DRAW_MODE_PARTIAL);
+    }
+    reflesh_times++;
 
-    frame_times = epd_wave_table_get_frames(temperature, EPD_DRAW_MODE_AUTO);
-
+    
     CopyToMixedGrayBuffer(hlcdc, RGBCode, Xpos0, Ypos0, Xpos1, Ypos1);
     LOG_I("Convert layer data take=%d(ms) \r\n", rt_tick_get() - start_tick);
 

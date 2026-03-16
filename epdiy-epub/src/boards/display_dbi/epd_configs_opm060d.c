@@ -2,12 +2,12 @@
 #include "epd_configs.h"
 #include "mem_section.h"
 #include "string.h"
-#ifdef LCD_USING_EPD_R7D005
-#define PART_DISP_TIMES       10        // After PART_DISP_TIMES-1 partial refreshes, perform a full refresh once
-static int reflesh_times = 0;
+#if defined(LCD_USING_OPM060D)
 
+#ifndef EPD_WAVEFORM_USE_BIN
 // 8bit lookup table for the current frame (high 4 bits: old data, low 4 bits: new data).
 // The output is 2-bit data.
+
 typedef struct {
     int min_temp;          
     int max_temp;        
@@ -15,7 +15,8 @@ typedef struct {
     const uint8_t (*wave_table)[256];  
 } WaveTableEntry;
 
-static const uint8_t r7d005_wave_full_0_100[32][256] = {
+
+static const uint8_t yzc085_wave_full_0_100[32][256] = {
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
@@ -48,7 +49,7 @@ static const uint8_t r7d005_wave_full_0_100[32][256] = {
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
 };
 
-static const uint8_t r7d005_wave_partial_0_100[12][256] = 
+static const uint8_t yzc085_wave_partial_0_100[12][256] = 
 {
     //0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f,0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f,0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f,0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f,0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f,0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f,0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f,0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f,0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f,0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f,0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f,0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f,0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f,0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f,0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f,0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f,
     {0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,2,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,0,},
@@ -65,12 +66,11 @@ static const uint8_t r7d005_wave_partial_0_100[12][256] =
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,},
 
 };
-
 static const WaveTableEntry full_wave_table = 
-    {0, 100, 32, &r7d005_wave_full_0_100[0]};
+    {0, 100, 32, &yzc085_wave_full_0_100[0]};
 
 static const WaveTableEntry partial_wave_table =
-    {0, 100, 12, &r7d005_wave_partial_0_100[0]};
+    {0, 100, 12, &yzc085_wave_partial_0_100[0]};
 
 static const uint8_t *p_current_wave_from = NULL;
 
@@ -82,22 +82,20 @@ void epd_wave_table(void)
 
 uint32_t epd_wave_table_get_frames(int temperature, EpdDrawMode mode)
 {
-    const WaveTableEntry *selected_table = NULL;
+    const WaveTableEntry *wave_table = NULL;
+    if (EPD_DRAW_MODE_FULL == mode) {
 
-    if (reflesh_times % PART_DISP_TIMES == 0) {
-
-        selected_table = &full_wave_table;
+        wave_table = &full_wave_table;
     } else {
-        selected_table = &partial_wave_table;
+        wave_table = &partial_wave_table;
     }
 
-    if (temperature < selected_table->min_temp || temperature >= selected_table->max_temp) {
-        selected_table = &full_wave_table;
+    if (temperature < wave_table->min_temp || temperature >= wave_table->max_temp) {
+        wave_table = &full_wave_table;
     }
-    p_current_wave_from = (const uint8_t *)&selected_table->wave_table[0][0];
-    reflesh_times++;
+    p_current_wave_from = (const uint8_t *)&wave_table->wave_table[0][0];
 
-    return selected_table->frame_count;
+    return wave_table->frame_count;
 }
 
 void epd_wave_table_fill_lut(uint32_t *p_epic_lut, uint32_t frame_num)
@@ -110,10 +108,47 @@ void epd_wave_table_fill_lut(uint32_t *p_epic_lut, uint32_t frame_num)
         p_epic_lut[i] = p_frame_wave[i] << 3;
 }
 
+#else /* EPD_WAVEFORM_USE_BIN */
+
+#include "mem_map.h"
+#include "epd_waveform_bin_reader.h"
+#ifndef CUSTOM_EPD_WAVE_TABLE_START_ADDR
+#error "CUSTOM_EPD_WAVE_TABLE_START_ADDR is not defined!!!"
+#endif
+
+void epd_wave_table(void)
+{
+    int ret = waveform_bin_reader_init(CUSTOM_EPD_WAVE_TABLE_START_ADDR, CUSTOM_EPD_WAVE_TABLE_SIZE);
+
+    if(ret != 0)
+    {
+        rt_kprintf("Failed to initialize custom EPD wave table reader! err=%d\n", ret);
+    }
+}
+
+uint32_t epd_wave_table_get_frames(int temperature, EpdDrawMode mode)
+{
+    uint32_t frames;
+
+    frames = waveform_bin_reader_get_frames(temperature, mode);
+
+    return frames;
+}
+
+void epd_wave_table_fill_lut(uint32_t *p_epic_lut, uint32_t frame_num)
+{
+    waveform_bin_reader_fill_lut(p_epic_lut, frame_num);
+}
+
+#endif /*EPD_WAVEFORM_USE_BIN*/
 
 uint16_t epd_get_vcom_voltage(void)
 {
+#if defined(LCD_USING_EPD_R7D005)
     return 2100;
+#else
+    return 1050;
+#endif
 }
 
 
@@ -121,7 +156,11 @@ const EPD_TimingConfig *epd_get_timing_config(void)
 {
     static const EPD_TimingConfig timing_config = {
         .sclk_freq = 24,
+#ifdef LCD_USING_EPD_R7D005
         .SDMODE = 1,
+#else
+        .SDMODE = 0,
+#endif
         .LSL = 0,
         .LBL = 0,
         .LDL = LCD_HOR_RES_MAX/4,
@@ -137,4 +176,4 @@ const EPD_TimingConfig *epd_get_timing_config(void)
     return &timing_config;
 }
 
-#endif /*LCD_USING_EPD_R7D005*/
+#endif /*LCD_USING_OPM060D*/
