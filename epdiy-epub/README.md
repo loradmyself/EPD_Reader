@@ -277,6 +277,7 @@ uint32_t epd_wave_table_get_frames(int temperature, EpdDrawMode mode)
             return wave_table[i].frame_count;
         }
     }
+    // 默认回退到第一组
     p_current_wave_from = (const uint8_t *)(*wave_table[0].wave_table);
     return wave_table[0].frame_count;
 }
