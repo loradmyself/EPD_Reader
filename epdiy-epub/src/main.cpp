@@ -124,6 +124,14 @@ rt_mq_t ui_queue = RT_NULL;
 
 void handleEpubTableContents(Renderer *renderer, UIAction action, bool needs_redraw);
 
+static rt_timer_t auto_page_timer = RT_NULL;
+static void auto_page_timer_cb(void *param)
+{
+    // 定时触发 KEY1 功能（UP = 上一页）
+    UIAction action = UIAction::DOWN;
+    rt_mq_send(ui_queue, &action, sizeof(UIAction));
+}
+
 
 void handleEpub(Renderer *renderer, UIAction action)
 {
@@ -1065,6 +1073,15 @@ void main_task(void *param)
   int last_bluetooth_connected = g_bluetooth_connected;
 
   screen_init(TIMEOUT_SHUTDOWN_TIME);
+
+  // 在 main_task 中 screen_init 之后：
+auto_page_timer = rt_timer_create("auto_page",
+                                   auto_page_timer_cb,
+                                   RT_NULL,
+                                   rt_tick_from_millisecond(5000), // 5秒翻一页
+                                   RT_TIMER_FLAG_PERIODIC | RT_TIMER_FLAG_SOFT_TIMER);
+if (auto_page_timer != RT_NULL)
+    //rt_timer_start(auto_page_timer);
 
   while ((rt_tick_get_millisecond() - last_user_interaction < 60 * 1000 * 60 * TIMEOUT_SHUTDOWN_TIME))
   {

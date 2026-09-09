@@ -93,7 +93,7 @@
             },
             {
                 "offset": "0x00EC0000",
-                "max_size": "0x00030000",
+                "max_size": "0x00040000",
                 "img": "wave_table",
                 "tags": [
                     "CUSTOM_EPD_WAVE_TABLE"

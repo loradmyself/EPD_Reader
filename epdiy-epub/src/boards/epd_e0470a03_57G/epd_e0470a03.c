@@ -17,10 +17,10 @@
 /**
   * @brief epd_opm060da chip IDs
   */
-#define THE_LCD_ID                  0x19355
+#define THE_LCD_ID                  0x19357
 
 #define  DBG_LEVEL            DBG_INFO  //DBG_LOG //
-#define LOG_TAG                "epd_e0470a01"
+#define LOG_TAG                "epd_e0470a03_57"
 #include "log.h"
 enum EpdRotation
 {
@@ -47,8 +47,8 @@ static enum EpdRotation display_rotation = EPD_ROT_LANDSCAPE;
 
 static const LCDC_InitTypeDef lcdc_int_cfg_edp_16bit =
 {
-    .lcd_itf = LCDC_INTF_EPD_16BIT,
-    .freq = 32 * 1000 * 1000, //sclk frequnecy  41.7ns/cycle
+    .lcd_itf = LCDC_INTF_EPD_8BIT,
+    .freq = 24 * 1000 * 1000, //sclk frequnecy  41.7ns/cycle
     .color_mode = LCDC_PIXEL_FORMAT_F2_SWAP,
 
     .cfg = {
@@ -66,7 +66,7 @@ static const LCDC_InitTypeDef lcdc_int_cfg_edp_16bit =
             //     (LSL+LBL+LDL+LEL) = 8+10+152+2 = 172
             .LSL = 8, //Line start length   300ns
             .LBL = 5, //Line begin length
-            .LDL = EPD_PANEL_HOR >> 3, //Line data length: 
+            .LDL = EPD_PANEL_HOR >> 2, //Line data length: 
             .LEL = 1, //Line end length      
 
             .GSTA = 3, //Gate STA length
@@ -407,7 +407,7 @@ static void LCD_WriteMultiplePixels(LCDC_HandleTypeDef *hlcdc, const uint8_t *RG
     HAL_LCDC_LayerSetLTab(hlcdc, HAL_LCDC_LAYER_DEFAULT, (LCDC_AColorDef *)lut);
 
 
-    total_frames = epd_wave_table_get_frames(26/*temperature*/, EPD_DRAW_MODE_AUTO);
+    total_frames = epd_wave_table_get_frames(38, EPD_DRAW_MODE_AUTO);
     curr_frame = 0;
     LOG_I("Done. Start to flush total_frames = %d", total_frames);
 
@@ -492,6 +492,6 @@ static const LCD_DrvOpsDef lcd_drv_operations =
     NULL
 };
 
-LCD_DRIVER_EXPORT2(epd_e0470a01, THE_LCD_ID, &lcdc_int_cfg,
+LCD_DRIVER_EXPORT2(epd_e0470a03_57, THE_LCD_ID, &lcdc_int_cfg,
                    &lcd_drv_operations, 1);
 
