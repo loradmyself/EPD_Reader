@@ -35,7 +35,7 @@ static const char *wave_mode_names[] = {
 #define WAVE_MODE_COUNT 10
 
 /* 手动控制温区 (-1=auto, 0~n=指定温区) */
-static int manual_temp_zone = -1;
+static int manual_temp_zone = 10;  // 默认第11个温区 (27~30°C)
 
 /* 温区边界和名称（与 bin 波形文件一致） */
 static const int temp_zones[] = {
