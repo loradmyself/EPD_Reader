@@ -8,6 +8,7 @@
 #include "epd_waveform.h"
 
 #include "string.h"
+#include <stdlib.h>
 
 #ifdef EPD_WAVEFORM_USE_BIN
     #include "mem_map.h"
@@ -20,9 +21,58 @@
 static int g_part_disp_times = 10;      // 每 g_part_disp_times 次刷新做一次全刷，其余局刷
 static int reflesh_times = 0;
 
+/* 强制使用静态波形表（跳过 bin 文件） */
+static int force_static_wave = 0;
+
+/* 手动控制波形模式 (-1=auto, 0~9=指定模式) */
+static int manual_wave_mode = -1;
+
+/* 波形模式名称 */
+static const char *wave_mode_names[] = {
+    "mode0", "mode1", "mode2", "mode3", "mode4",
+    "mode5", "mode6", "mode7", "mode8", "mode9"
+};
+#define WAVE_MODE_COUNT 10
+
+/* 手动控制温区 (-1=auto, 0~n=指定温区) */
+static int manual_temp_zone = -1;
+
+/* 温区边界和名称（与 bin 波形文件一致） */
+static const int temp_zones[] = {
+    -128, 0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 38, 128
+};
+static const char *temp_zone_names[] = {
+    "-128~0", "0~3", "3~6", "6~9", "9~12", "12~15",
+    "15~18", "18~21", "21~24", "24~27", "27~30", "30~33",
+    "33~38", "38~128"
+};
+#define TEMP_ZONE_COUNT (sizeof(temp_zones) / sizeof(temp_zones[0]) - 1)
+
 void set_part_disp_times(int val)
 {
     g_part_disp_times = val > 0 ? val : 1;   // 0 表示每次全刷
+}
+
+/* 获取/设置波形模式 */
+int epd_wave_get_mode(void)
+{
+    return manual_wave_mode;
+}
+
+void epd_wave_set_mode(int mode)
+{
+    manual_wave_mode = mode;   // -1=auto, 0=full, 1=partial
+}
+
+/* 获取/设置温区 */
+int epd_wave_get_tempzone(void)
+{
+    return manual_temp_zone;
+}
+
+void epd_wave_set_tempzone(int zone)
+{
+    manual_temp_zone = zone;   // -1=auto, 0~n=指定温区
 }
 
 // 8bit lookup table for the current frame (high 4 bits: old data, low 4 bits: new data).
@@ -124,12 +174,41 @@ uint32_t epd_wave_table_get_frames(int temperature, EpdDrawMode mode)
     }
 
 #ifdef EPD_WAVEFORM_USE_BIN
-    if (epd_waveform_bin_inited_ret == 0)
+    if (epd_waveform_bin_inited_ret == 0 && force_static_wave == 0)
     {
-        WAVE_TABLE_MODE_T wave_table_mode = (EPD_DRAW_MODE_PARTIAL == mode)
-                                            ? WAVE_MODE_PARTIAL
-                                            : WAVE_MODE_FULL;
-        return waveform_bin_reader_get_frames(temperature, wave_table_mode);
+        WAVE_TABLE_MODE_T wave_table_mode;
+
+        // 手动波形模式覆盖 (0~9)
+        if (manual_wave_mode >= 0 && manual_wave_mode < WAVE_MODE_COUNT)
+        {
+            // 直接使用用户选择的模式
+            wave_table_mode = (WAVE_TABLE_MODE_T)manual_wave_mode;
+        }
+        else
+        {
+            // 自动根据 EpdDrawMode 映射
+            wave_table_mode = (EPD_DRAW_MODE_PARTIAL == mode)
+                              ? WAVE_MODE_PARTIAL
+                              : WAVE_MODE_FULL;
+        }
+
+        // 手动温区覆盖：根据温区索引设置温度值
+        int actual_temperature = temperature;
+        if (manual_temp_zone >= 0 && manual_temp_zone < TEMP_ZONE_COUNT)
+        {
+            // 使用温区中间值作为温度
+            actual_temperature = (temp_zones[manual_temp_zone] + temp_zones[manual_temp_zone + 1]) / 2;
+        }
+
+        // 显示当前温区和模式信息
+        rt_kprintf("EPD: temp=%d->%d, zone=%d, mode=%d(%s), static=%d\n",
+                   temperature, actual_temperature, manual_temp_zone,
+                   wave_table_mode,
+                   wave_table_mode < WAVE_MODE_COUNT ?
+                   wave_mode_names[wave_table_mode] : "unknown",
+                   force_static_wave);
+
+        return waveform_bin_reader_get_frames(actual_temperature, wave_table_mode);
     }
 #endif
 
@@ -155,7 +234,7 @@ uint32_t epd_wave_table_get_frames(int temperature, EpdDrawMode mode)
 void epd_wave_table_fill_lut(uint32_t *p_argb8888_lut, uint32_t frame_num)
 {
 #ifdef EPD_WAVEFORM_USE_BIN
-    if (epd_waveform_bin_inited_ret == 0)
+    if (epd_waveform_bin_inited_ret == 0 && force_static_wave == 0)
     {
         waveform_bin_reader_fill_lut(p_argb8888_lut, frame_num);
         // BIN fill_lut puts values at bit[4:3] (for EPIC), but EPD_8BIT + F2_SWAP
@@ -171,3 +250,120 @@ void epd_wave_table_fill_lut(uint32_t *p_argb8888_lut, uint32_t frame_num)
     for (uint16_t i = 0; i < 256; i++)
         p_argb8888_lut[i] = 0xFF000000 | p_frame_wave[i];
 }
+
+/* finsh 命令: staticwave <0|1>
+ *   0=使用 bin 波形（默认）, 1=强制使用静态波形表
+ */
+static int cmd_staticwave(int argc, char **argv)
+{
+    if (argc < 2)
+    {
+        rt_kprintf("Usage: staticwave <0|1>\n");
+        rt_kprintf("  0=use bin waveform (default)\n");
+        rt_kprintf("  1=force static waveform table (yzc085_wave_full_0_100)\n");
+        rt_kprintf("  current: %s\n", force_static_wave ? "static" : "bin");
+        return 0;
+    }
+
+    force_static_wave = atoi(argv[1]) ? 1 : 0;
+    rt_kprintf("StaticWave: %s\n", force_static_wave ? "force static waveform" : "use bin waveform");
+    return 0;
+}
+MSH_CMD_EXPORT(cmd_staticwave, force use static waveform table);
+
+/* finsh 命令: wmode <auto|0|1|...|9>
+ *   设置波形模式
+ */
+static int cmd_wmode(int argc, char **argv)
+{
+    if (argc < 2)
+    {
+        rt_kprintf("Usage: wmode <auto|0|1|...|9>\n");
+        rt_kprintf("  auto = 自动切换（默认）\n");
+        for (int i = 0; i < WAVE_MODE_COUNT; i++)
+            rt_kprintf("  %d    = %s\n", i, wave_mode_names[i]);
+        rt_kprintf("  current: %s\n",
+                   manual_wave_mode == -1 ? "auto" :
+                   (manual_wave_mode < WAVE_MODE_COUNT ?
+                    wave_mode_names[manual_wave_mode] : "unknown"));
+        return 0;
+    }
+
+    if (strcmp(argv[1], "auto") == 0)
+    {
+        manual_wave_mode = -1;
+    }
+    else
+    {
+        int mode = atoi(argv[1]);
+        if (mode < 0 || mode >= WAVE_MODE_COUNT)
+        {
+            rt_kprintf("Invalid mode: %s (valid: 0~%d)\n", argv[1], WAVE_MODE_COUNT - 1);
+            return -1;
+        }
+        manual_wave_mode = mode;
+    }
+
+    rt_kprintf("WaveMode: %s\n",
+               manual_wave_mode == -1 ? "auto" :
+               (manual_wave_mode < WAVE_MODE_COUNT ?
+                wave_mode_names[manual_wave_mode] : "unknown"));
+    return 0;
+}
+MSH_CMD_EXPORT(cmd_wmode, set EPD wave mode);
+
+/* finsh 命令: tempzone <auto|0|1|...>
+ *   设置温区
+ */
+static int cmd_tempzone(int argc, char **argv)
+{
+    if (argc < 2)
+    {
+        rt_kprintf("Usage: tempzone <auto|0|1|...>\n");
+        rt_kprintf("  auto = 自动根据温度选择（默认）\n");
+        for (int i = 0; i < TEMP_ZONE_COUNT; i++)
+            rt_kprintf("  %2d   = %s°C\n", i, temp_zone_names[i]);
+        rt_kprintf("  current: %s\n",
+                   manual_temp_zone == -1 ? "auto" :
+                   (manual_temp_zone < TEMP_ZONE_COUNT ?
+                    temp_zone_names[manual_temp_zone] : "unknown"));
+        return 0;
+    }
+
+    if (strcmp(argv[1], "auto") == 0)
+    {
+        manual_temp_zone = -1;
+    }
+    else
+    {
+        int zone = atoi(argv[1]);
+        if (zone < 0 || zone >= TEMP_ZONE_COUNT)
+        {
+            rt_kprintf("Invalid zone: %s (valid: 0~%d)\n", argv[1], TEMP_ZONE_COUNT - 1);
+            return -1;
+        }
+        manual_temp_zone = zone;
+    }
+
+    rt_kprintf("TempZone: %s\n",
+               manual_temp_zone == -1 ? "auto" :
+               (manual_temp_zone < TEMP_ZONE_COUNT ?
+                temp_zone_names[manual_temp_zone] : "unknown"));
+    return 0;
+}
+MSH_CMD_EXPORT(cmd_tempzone, set EPD temperature zone);
+
+/* finsh 命令: halt
+ *   暂停 EPD 刷新
+ */
+static int cmd_halt(int argc, char **argv)
+{
+    rt_kprintf("EPD halt - system halted\n");
+    rt_enter_critical();
+    while (1)
+    {
+        rt_thread_mdelay(1000);
+    }
+    return 0;
+}
+MSH_CMD_EXPORT(cmd_halt, halt EPD refresh);

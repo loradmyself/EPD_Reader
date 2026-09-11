@@ -96,7 +96,7 @@ static const WaveTableEntry partial_wave_table =
 
 static const uint8_t *p_current_wave_from = NULL;
 #ifdef EPD_WAVEFORM_USE_BIN
-    static uint8_t epd_waveform_bin_inited_ret = 0;
+    static int8_t epd_waveform_bin_inited_ret = 0;
 #endif
 
 void epd_wave_table(void)

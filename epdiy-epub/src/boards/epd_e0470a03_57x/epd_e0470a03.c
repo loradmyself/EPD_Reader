@@ -48,7 +48,7 @@ static enum EpdRotation display_rotation = EPD_ROT_LANDSCAPE;
 static const LCDC_InitTypeDef lcdc_int_cfg_edp_16bit =
 {
     .lcd_itf = LCDC_INTF_EPD_8BIT,
-    .freq = 24 * 1000 * 1000, //sclk frequnecy  41.7ns/cycle
+    .freq = 24 * 1000 * 1000, 
     .color_mode = LCDC_PIXEL_FORMAT_F2_SWAP,
 
     .cfg = {
@@ -62,12 +62,10 @@ static const LCDC_InitTypeDef lcdc_int_cfg_edp_16bit =
             .GDSP_polarity = 0,
             .GDCLK_polarity = 0, //Gate clock polarity
 
-            //     (LSL+LBL+LDL+LEL) >= 24MHz/200k  = 120    <=200KHz
-            //     (LSL+LBL+LDL+LEL) = 8+10+152+2 = 172
-            .LSL = 8, //Line start length   300ns
-            .LBL = 5, //Line begin length
+            .LSL = 4, //Line start length   300ns
+            .LBL = 1, //Line begin length
             .LDL = EPD_PANEL_HOR >> 2, //Line data length: 
-            .LEL = 1, //Line end length      
+            .LEL = 3, //Line end length      
 
             .GSTA = 3, //Gate STA length
 
@@ -195,6 +193,12 @@ L1_RET_CODE_SECT(epd_codes, static void CopyToMixedGrayBuffer(LCDC_HandleTypeDef
 {
     RT_ASSERT(LCD_HOR_RES_MAX == (Xpos1 - Xpos0 + 1));
     RT_ASSERT(LCD_VER_RES_MAX == (Ypos1 - Ypos0 + 1));
+
+    rt_kprintf("[EPD] flush: %s, src=%dx%d\n",
+               display_rotation == EPD_ROT_INVERTED_PORTRAIT ? "PORTRAIT(rot)" :
+               display_rotation == EPD_ROT_LANDSCAPE ? "LANDSCAPE" :
+               display_rotation == EPD_ROT_PORTRAIT ? "PORTRAIT" : "INV_LANDSCAPE",
+               Xpos1 - Xpos0 + 1, Ypos1 - Ypos0 + 1);
 
     //Convert layer data to 4bit gray data
     if (hlcdc->Layer[HAL_LCDC_LAYER_DEFAULT].data_format == LCDC_PIXEL_FORMAT_MONO)
@@ -407,7 +411,7 @@ static void LCD_WriteMultiplePixels(LCDC_HandleTypeDef *hlcdc, const uint8_t *RG
     HAL_LCDC_LayerSetLTab(hlcdc, HAL_LCDC_LAYER_DEFAULT, (LCDC_AColorDef *)lut);
 
 
-    total_frames = epd_wave_table_get_frames(38, EPD_DRAW_MODE_AUTO);
+    total_frames = epd_wave_table_get_frames(26, EPD_DRAW_MODE_AUTO);
     curr_frame = 0;
     LOG_I("Done. Start to flush total_frames = %d", total_frames);
 
